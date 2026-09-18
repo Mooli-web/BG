@@ -81,6 +81,13 @@ def _checkpoint_payload(
     }
 
 
+def _atomic_torch_save(payload: dict[str, Any], path: Path) -> None:
+    """Write a checkpoint atomically so a Colab disconnect cannot ruin latest.pt."""
+    temporary_path = path.with_name(path.name + ".tmp")
+    torch.save(payload, temporary_path)
+    temporary_path.replace(path)
+
+
 def _save_checkpoint(
     directory: Path,
     model: BackgammonActorCritic,
@@ -91,17 +98,12 @@ def _save_checkpoint(
     periodic: bool = False,
 ) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
+    payload = _checkpoint_payload(model, optimizer, config, global_steps, update)
     latest = directory / "latest.pt"
-    torch.save(
-        _checkpoint_payload(model, optimizer, config, global_steps, update),
-        latest,
-    )
+    _atomic_torch_save(payload, latest)
     if periodic:
         periodic_path = directory / f"checkpoint_{global_steps:012d}.pt"
-        torch.save(
-            _checkpoint_payload(model, optimizer, config, global_steps, update),
-            periodic_path,
-        )
+        _atomic_torch_save(payload, periodic_path)
     return latest
 
 
@@ -233,6 +235,19 @@ def train(config: TrainConfig) -> Path:
         global_steps = int(checkpoint.get("global_steps", checkpoint.get("total_steps", 0)))
         update = int(checkpoint.get("update", 0))
         print(f"Resumed {config.resume} at {global_steps:,} environment steps.")
+    else:
+        # Create a valid restart point immediately. This is especially useful
+        # when a Colab runtime disconnects during the first rollout.
+        initial_path = _save_checkpoint(
+            checkpoint_dir,
+            model,
+            optimizer,
+            config,
+            global_steps,
+            update,
+            periodic=False,
+        )
+        print(f"Saved initial checkpoint: {initial_path}")
 
     envs = [
         BackgammonEnv(seed=config.seed + 10_000 + index, reward_shaping=config.reward_shaping)

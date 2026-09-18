@@ -2,7 +2,7 @@
 
 این پروژه یک بازیکن تخته‌نرد است که با **Self-Play و PPO** آموزش می‌بیند. پیشنهاد استفاده‌ی فعلی این است:
 
-- **آموزش و ارزیابی متنی:** Google Colab با GPU؛
+- **آموزش و ارزیابی متنی:** Google Colab، به‌صورت پیش‌فرض با CPU؛ GPU اختیاری؛
 - **بازی گرافیکی انسان مقابل مدل:** کامپیوتر Windows با pygame.
 
 > منظور `BG` در این پروژه، Backgammon / تخته‌نرد است.
@@ -68,25 +68,34 @@ notebooks/BG_Colab_Train.ipynb
 
 در Colab:
 
-1. از منوی `Runtime`، گزینه‌ی `Change runtime type` را باز کنید؛
-2. در بخش `Hardware accelerator` گزینه‌ی `T4 GPU` یا GPU موجود را انتخاب کنید؛
-3. سلول‌ها را به‌ترتیب اجرا کنید؛
-4. Google Drive را mount کنید؛
-5. آموزش را شروع کنید.
+1. notebook را باز کنید؛
+2. سلول‌ها را به‌ترتیب اجرا کنید؛
+3. Google Drive را mount کنید؛
+4. آموزش را شروع کنید.
 
-Notebook به‌صورت خودکار repository را clone می‌کند، وابستگی‌های آموزش را نصب می‌کند و checkpoint را داخل Google Drive ذخیره می‌کند.
+نسخه‌ی فعلی notebook به‌صورت پیش‌فرض روی **CPU** تنظیم شده است. برای این محیط کوچک، تولید حرکت‌های قانونی با Python بخش مهمی از زمان را مصرف می‌کند و یک GPU ضعیف الزاماً سریع‌تر نیست. همچنین CPU از خطاهای مربوط به GPU و قطع شدن CUDA جلوگیری می‌کند.
+
+Notebook به‌صورت خودکار repository را clone می‌کند، وابستگی‌های آموزش را نصب می‌کند، checkpoint را داخل Google Drive ذخیره می‌کند و آموزش را chunk به chunk ادامه می‌دهد.
+
+اگر بعداً خواستید GPU را آزمایش کنید، داخل notebook مقدار زیر را تغییر دهید:
+
+```python
+DEVICE = 'auto'
+```
 
 ## روش دستی در Colab
 
-### ۱. فعال کردن GPU
+### ۱. انتخاب CPU یا GPU
 
-از منوی Colab:
+برای CPU، لازم نیست GPU فعال کنید. فقط مطمئن شوید Runtime عادی Python است.
+
+برای آزمایش GPU اختیاری:
 
 ```text
 Runtime → Change runtime type → Hardware accelerator → GPU
 ```
 
-سپس این سلول را اجرا کنید:
+بررسی وضعیت:
 
 ```python
 !nvidia-smi
@@ -127,7 +136,7 @@ if torch.cuda.is_available():
     print("GPU:", torch.cuda.get_device_name(0))
 ```
 
-اگر `CUDA available` برابر `False` بود، از منوی Runtime نوع GPU را انتخاب کنید و runtime را restart کنید.
+اگر می‌خواهید با CPU کار کنید، `CUDA available: False` طبیعی است و مشکلی نیست. فقط اگر `DEVICE = 'auto'` انتخاب کرده‌اید باید GPU فعال باشد.
 
 ### ۴. اتصال Google Drive
 
@@ -144,9 +153,9 @@ os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 print(CHECKPOINT_DIR)
 ```
 
-### ۵. شروع آموزش از صفر
+### ۵. اجرای یک chunk آموزش از صفر
 
-این دستور از checkpoint قدیمی استفاده نمی‌کند:
+برای جلوگیری از از دست رفتن چند ساعت کار هنگام قطع شدن Colab، آموزش را به chunkهای ۲۵۰ هزار تصمیمی تقسیم کنید. این اجرای اول از checkpoint قدیمی استفاده نمی‌کند و روی CPU اجرا می‌شود:
 
 ```python
 import subprocess
@@ -154,12 +163,12 @@ import sys
 
 command = [
     sys.executable, '-m', 'bg', 'train',
-    '--total-steps', '5000000',
-    '--num-envs', '16',
-    '--rollout-steps', '256',
-    '--device', 'auto',
+    '--total-steps', '250000',
+    '--num-envs', '8',
+    '--rollout-steps', '128',
+    '--device', 'cpu',
     '--checkpoint-dir', CHECKPOINT_DIR,
-    '--save-interval', '25',
+    '--save-interval', '5',
     '--log-interval', '10',
     '--seed', '7',
 ]
@@ -167,6 +176,8 @@ command = [
 print(' '.join(command))
 subprocess.run(command, check=True)
 ```
+
+Notebook آماده همین کار را خودکار انجام می‌دهد؛ اگر Colab قطع شد، کافی است همان سلول chunk را دوباره اجرا کنید.
 
 فایل‌های مهم در Google Drive:
 
@@ -178,29 +189,29 @@ BG_RL/checkpoints_fixed_rules/checkpoint_XXXXXXXXXXXX.pt
 
 `latest.pt` مدل فعلی است و `training.csv` آمار آموزش را نگه می‌دارد.
 
-اگر GPU ضعیف بود، مقدار `--num-envs` را از `16` به `8` کاهش دهید. اگر حافظه و GPU کافی بود، می‌توانید آن را به `32` افزایش دهید.
+تنظیم پیشنهادی پایدار برای CPU همین `8` محیط و `128` rollout است. اگر سرعت کافی بود، `--num-envs` را به `16` افزایش دهید. GPU در این پروژه اختیاری است و الزاماً به‌دلیل کوچک بودن شبکه سریع‌تر نیست.
 
 ### ۶. ادامه‌ی آموزش بعد از قطع Colab
 
-ابتدا دوباره سلول‌های clone، نصب وابستگی و اتصال Drive را اجرا کنید، سپس:
+ابتدا دوباره سلول‌های clone، نصب وابستگی و اتصال Drive را اجرا کنید. اگر chunk قبلی تا ۲۵۰ هزار step رسیده بود، هدف chunk بعدی را ۵۰۰ هزار بگذارید:
 
 ```python
 command = [
     sys.executable, '-m', 'bg', 'train',
     '--resume', os.path.join(CHECKPOINT_DIR, 'latest.pt'),
-    '--total-steps', '10000000',
-    '--num-envs', '16',
-    '--rollout-steps', '256',
-    '--device', 'auto',
+    '--total-steps', '500000',
+    '--num-envs', '8',
+    '--rollout-steps', '128',
+    '--device', 'cpu',
     '--checkpoint-dir', CHECKPOINT_DIR,
-    '--save-interval', '25',
+    '--save-interval', '5',
     '--log-interval', '10',
 ]
 
 subprocess.run(command, check=True)
 ```
 
-عدد `10000000` هدف نهایی است. یعنی اگر تا ۵ میلیون step آموزش دیده‌اید، حدود ۵ میلیون step دیگر اجرا می‌شود.
+برای chunkهای بعدی مقدار `--total-steps` را به ۷۵۰۰۰۰، ۱۰۰۰۰۰۰ و ... افزایش دهید. Notebook این مقدارها را خودکار مدیریت می‌کند. اگر هدف نهایی را `10000000` بگذارید، آموزش از checkpoint فعلی تا ۱۰ میلیون step ادامه پیدا می‌کند.
 
 ### ۷. ارزیابی در Colab
 
@@ -211,7 +222,7 @@ command = [
     sys.executable, '-m', 'bg', 'evaluate',
     '--checkpoint', os.path.join(CHECKPOINT_DIR, 'latest.pt'),
     '--games', '100',
-    '--device', 'auto',
+    '--device', 'cpu',
 ]
 
 subprocess.run(command, check=True)
