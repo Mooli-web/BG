@@ -1,0 +1,4 @@
+# Google Colab already includes PyTorch in most runtimes.  Keeping it here
+# also makes the notebook work in a fresh Python runtime.
+numpy>=1.26,<3
+torch>=2.2

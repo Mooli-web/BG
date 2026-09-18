@@ -1,0 +1,4 @@
+# Dependencies needed on the local Windows computer for evaluation and GUI play.
+numpy>=1.26,<3
+pygame>=2.5,<3
+torch>=2.2

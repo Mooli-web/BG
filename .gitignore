@@ -20,6 +20,9 @@ logs/
 *.pth
 *.ckpt
 
+# Notebooks
+.ipynb_checkpoints/
+
 # IDE / OS
 .vscode/
 .idea/

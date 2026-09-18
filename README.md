@@ -1,251 +1,364 @@
 # BG — هوش مصنوعی تخته‌نرد با یادگیری تقویتی
 
-این پروژه یک بازیکن تخته‌نرد است که **از صفر و با self-play** (بازی کردن با نسخه‌های خودش) آموزش می‌بیند. کد کاملاً Python است و بعد از آموزش می‌توان با یک صفحه‌ی گرافیکی pygame مقابل آن بازی کرد.
+این پروژه یک بازیکن تخته‌نرد است که با **Self-Play و PPO** آموزش می‌بیند. پیشنهاد استفاده‌ی فعلی این است:
 
-> منظور این پروژه از `BG`، **Backgammon / تخته‌نرد** است. اگر بازی دیگری مدنظر است، باید محیط و قوانین همان بازی جایگزین شود.
+- **آموزش و ارزیابی متنی:** Google Colab با GPU؛
+- **بازی گرافیکی انسان مقابل مدل:** کامپیوتر Windows با pygame.
 
-## چه چیزی ساخته شده است؟
+> منظور `BG` در این پروژه، Backgammon / تخته‌نرد است.
 
-- محیط کامل تخته‌نرد شامل:
-  - دو تاس معمولی و تاس جفت چهارحرکتی؛
-  - ورود مهره از bar؛
-  - زدن مهره‌ی تک حریف؛
-  - قانون اجبار استفاده از بیشترین تعداد تاس ممکن؛
-  - قانون تاس بزرگ‌تر وقتی فقط یک تاس قابل استفاده است؛
-  - قوانین دقیق بیرون آوردن مهره‌ها؛ بیرون آوردن فقط وقتی ممکن است که هر ۱۵ مهره در خانه‌ی بازیکن باشند.
-- آموزش self-play با **PPO** و action masking.
-- یک شبکه‌ی عصبی **Residual MLP Actor-Critic**:
-  - ورودی کوچک و ساختاریافته‌ی تخته‌نرد، نه تصویر؛
-  - سه بلوک residual با ۲۵۶ نورون؛
-  - یک head برای احتمال حرکت و یک head برای ارزش وضعیت؛
-  - حرکت‌های غیرقانونی قبل از نمونه‌برداری از سیاست حذف می‌شوند.
-- اجرای موازی چندین بازی برای رسیدن به میلیون‌ها تصمیم آموزشی.
-- ذخیره‌ی `latest.pt`، checkpointهای دوره‌ای و `training.csv`.
-- ارزیابی مقابل بازیکن تصادفی یا self-play.
-- رابط گرافیکی مناسب برای بازی انسان با مدل آموزش‌دیده؛ چیدمان استاندارد، شماره‌گذاری واضح و جهت حرکت هر رنگ.
-- اجرای آهسته‌ی حرکت‌های AI همراه با نمایش تاس‌های اصلی، تاس‌های مصرف‌شده و آخرین حرکت AI.
-- نوار ارزیابی زنده از دید AI در بازه‌ی `-1` تا `+1`.
+## امکانات
+
+- قوانین تخته‌نرد شامل تاس جفت، Bar، زدن مهره، بیشترین تعداد حرکت و قانون تاس بزرگ‌تر؛
+- جلوگیری از بیرون آوردن مهره تا زمانی که هر ۱۵ مهره‌ی بازیکن به خانه‌ی خودش نرسیده باشند؛
+- محیط Self-Play با action masking؛
+- الگوریتم PPO؛
+- شبکه‌ی Residual MLP Actor-Critic با سه بلوک ۲۵۶ نورونی؛
+- اجرای موازی چندین بازی برای آموزش چندمیلیونی؛
+- checkpoint قابل ذخیره در Google Drive و ادامه‌ی آموزش؛
+- ارزیابی مقابل بازیکن تصادفی بدون نیاز به pygame؛
+- رابط گرافیکی استاندارد برای Windows؛
+- مکث قابل تنظیم بین حرکت‌های AI، نمایش تاس کامل، تاس مصرف‌شده و آخرین حرکت؛
+- نوار زنده‌ی `AI evaluation` از دید شبکه؛
 - تست‌های قوانین و محیط.
 
-## چرا PPO و Residual MLP؟
+## نکته‌ی مهم درباره‌ی checkpoint قدیمی
 
-در تخته‌نرد، نتیجه‌ی حرکت به تاس و تصمیم‌های متوالی همان نوبت وابسته است و تعداد حرکت‌های قانونی در هر وضعیت متغیر است. PPO با یک سیاست stochastic برای چنین محیطی انتخاب مناسبی است. محیط، حرکت‌های غیرقانونی را mask می‌کند تا شبکه هیچ‌وقت از میان حرکت‌های نامعتبر انتخاب نکند.
+در نسخه‌ی اولیه یک خطای قانونی وجود داشت که اجازه می‌داد بازیکن قبل از ورود تمام مهره‌ها به خانه، مهره‌ای را خارج کند. این خطا اصلاح شده است.
 
-چون ورودی، صفحه‌ی دوبعدی تصویری نیست و فقط ۲۴ خانه، bar، مهره‌های خارج‌شده و تاس‌ها را توصیف می‌کند، شبکه‌ی MLP از CNN مناسب‌تر و بسیار سبک‌تر است. وضعیت برای بازیکنِ نوبت‌دار canonical می‌شود؛ بنابراین یک شبکه هم White و هم Black را یاد می‌گیرد.
-
-این مدل یک پروژه‌ی پژوهشی/آموزشی است و ادعای هم‌سطح بودن با موتورهای حرفه‌ای تخته‌نرد ندارد. قدرت آن مستقیماً به تعداد تصمیم‌های آموزشی و سخت‌افزار شما بستگی دارد.
+بنابراین checkpointهایی که قبل از این اصلاح آموزش داده شده‌اند برای آموزش معتبر مناسب نیستند. آموزش جدید را بدون `--resume` و در یک پوشه‌ی جدید شروع کنید.
 
 ## ساختار پروژه
 
 ```text
 bg/
   constants.py     کدگذاری action و اندازه‌های محیط
-  game.py          قوانین خالص تخته‌نرد و تولید حرکت
-  env.py           محیط self-play و observation/action mask
+  game.py          قوانین تخته‌نرد و تولید حرکت
+  env.py           محیط Self-Play و action mask
   model.py         شبکه Actor-Critic و بارگذاری checkpoint
-  training.py      حلقه‌ی PPO، rollout موازی و ذخیره مدل
-  evaluate.py      بازی مدل مقابل random یا خودش
+  training.py      حلقه PPO و ذخیره مدل
+  evaluate.py      ارزیابی مقابل random یا self-play
   ui.py            رابط گرافیکی pygame
   cli.py           دستورات train / evaluate / play
-  __main__.py      اجرای python -m bg
+
+notebooks/
+  BG_Colab_Train.ipynb    notebook آماده‌ی آموزش در Colab
 
 tests/
   test_game.py
   test_env.py
+
+requirements-colab.txt    وابستگی‌های آموزش Colab
+requirements-play.txt     وابستگی‌های کامپیوتر Windows
 ```
 
-## اجرای کامل روی Windows، از clone تا بازی
+# مسیر پیشنهادی: آموزش در Google Colab
 
-### ۱) نصب ابزارهای لازم
+## روش سریع: باز کردن notebook
 
-1. Git for Windows را نصب کنید: <https://git-scm.com/download/win>
-2. Python نسخه‌ی 3.10 یا جدیدتر نصب کنید. برای این پروژه Python 3.11 پیشنهاد می‌شود و هنگام نصب، گزینه‌ی **Add Python to PATH** را فعال کنید.
-3. PowerShell را باز کنید.
+Notebook آماده در این مسیر قرار دارد:
 
-اگر اجرای اسکریپت PowerShell بسته بود، فقط برای پنجره‌ی فعلی این دستور را بزنید:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```text
+notebooks/BG_Colab_Train.ipynb
 ```
 
-### ۲) clone کردن کد
+می‌توانید از این لینک آن را در Colab باز کنید:
 
-کد این session روی branch زیر GitHub قرار می‌گیرد:
+<https://colab.research.google.com/github/Mooli-web/BG/blob/arena/01a0b49e-bg/notebooks/BG_Colab_Train.ipynb>
+
+در Colab:
+
+1. از منوی `Runtime`، گزینه‌ی `Change runtime type` را باز کنید؛
+2. در بخش `Hardware accelerator` گزینه‌ی `T4 GPU` یا GPU موجود را انتخاب کنید؛
+3. سلول‌ها را به‌ترتیب اجرا کنید؛
+4. Google Drive را mount کنید؛
+5. آموزش را شروع کنید.
+
+Notebook به‌صورت خودکار repository را clone می‌کند، وابستگی‌های آموزش را نصب می‌کند و checkpoint را داخل Google Drive ذخیره می‌کند.
+
+## روش دستی در Colab
+
+### ۱. فعال کردن GPU
+
+از منوی Colab:
+
+```text
+Runtime → Change runtime type → Hardware accelerator → GPU
+```
+
+سپس این سلول را اجرا کنید:
+
+```python
+!nvidia-smi
+```
+
+### ۲. دریافت کد
+
+```python
+!git clone -b arena/01a0b49e-bg https://github.com/Mooli-web/BG.git /content/BG
+%cd /content/BG
+```
+
+اگر قبلاً repository را clone کرده‌اید:
+
+```python
+%cd /content/BG
+!git fetch origin arena/01a0b49e-bg
+!git checkout arena/01a0b49e-bg
+!git pull origin arena/01a0b49e-bg
+```
+
+### ۳. نصب وابستگی‌های مخصوص آموزش
+
+برای آموزش pygame لازم نیست:
+
+```python
+%pip install -q -r requirements-colab.txt
+```
+
+بررسی GPU و PyTorch:
+
+```python
+import torch
+
+print("PyTorch:", torch.__version__)
+print("CUDA available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("GPU:", torch.cuda.get_device_name(0))
+```
+
+اگر `CUDA available` برابر `False` بود، از منوی Runtime نوع GPU را انتخاب کنید و runtime را restart کنید.
+
+### ۴. اتصال Google Drive
+
+اگر checkpoint را فقط در `/content` ذخیره کنید، با قطع شدن Colab از بین می‌رود. پس Google Drive را وصل کنید:
+
+```python
+from google.colab import drive
+import os
+
+drive.mount('/content/drive')
+
+CHECKPOINT_DIR = '/content/drive/MyDrive/BG_RL/checkpoints_fixed_rules'
+os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+print(CHECKPOINT_DIR)
+```
+
+### ۵. شروع آموزش از صفر
+
+این دستور از checkpoint قدیمی استفاده نمی‌کند:
+
+```python
+import subprocess
+import sys
+
+command = [
+    sys.executable, '-m', 'bg', 'train',
+    '--total-steps', '5000000',
+    '--num-envs', '16',
+    '--rollout-steps', '256',
+    '--device', 'auto',
+    '--checkpoint-dir', CHECKPOINT_DIR,
+    '--save-interval', '25',
+    '--log-interval', '10',
+    '--seed', '7',
+]
+
+print(' '.join(command))
+subprocess.run(command, check=True)
+```
+
+فایل‌های مهم در Google Drive:
+
+```text
+BG_RL/checkpoints_fixed_rules/latest.pt
+BG_RL/checkpoints_fixed_rules/training.csv
+BG_RL/checkpoints_fixed_rules/checkpoint_XXXXXXXXXXXX.pt
+```
+
+`latest.pt` مدل فعلی است و `training.csv` آمار آموزش را نگه می‌دارد.
+
+اگر GPU ضعیف بود، مقدار `--num-envs` را از `16` به `8` کاهش دهید. اگر حافظه و GPU کافی بود، می‌توانید آن را به `32` افزایش دهید.
+
+### ۶. ادامه‌ی آموزش بعد از قطع Colab
+
+ابتدا دوباره سلول‌های clone، نصب وابستگی و اتصال Drive را اجرا کنید، سپس:
+
+```python
+command = [
+    sys.executable, '-m', 'bg', 'train',
+    '--resume', os.path.join(CHECKPOINT_DIR, 'latest.pt'),
+    '--total-steps', '10000000',
+    '--num-envs', '16',
+    '--rollout-steps', '256',
+    '--device', 'auto',
+    '--checkpoint-dir', CHECKPOINT_DIR,
+    '--save-interval', '25',
+    '--log-interval', '10',
+]
+
+subprocess.run(command, check=True)
+```
+
+عدد `10000000` هدف نهایی است. یعنی اگر تا ۵ میلیون step آموزش دیده‌اید، حدود ۵ میلیون step دیگر اجرا می‌شود.
+
+### ۷. ارزیابی در Colab
+
+ارزیابی بدون رابط گرافیکی و بدون pygame انجام می‌شود:
+
+```python
+command = [
+    sys.executable, '-m', 'bg', 'evaluate',
+    '--checkpoint', os.path.join(CHECKPOINT_DIR, 'latest.pt'),
+    '--games', '100',
+    '--device', 'auto',
+]
+
+subprocess.run(command, check=True)
+```
+
+### ۸. دانلود مدل برای Windows
+
+بعد از پایان آموزش:
+
+```python
+from google.colab import files
+
+files.download(os.path.join(CHECKPOINT_DIR, 'latest.pt'))
+```
+
+اگر فایل بزرگ بود، به‌جای download مستقیم، از Google Drive روی کامپیوتر sync یا download کنید.
+
+# اجرای بازی روی Windows
+
+در Windows فقط checkpoint را می‌گیریم و بازی می‌کنیم؛ آموزش روی کامپیوتر انجام نمی‌شود.
+
+## ۱. اگر پوشه‌ی قبلی را پاک کرده‌اید
+
+در PowerShell، از یک مسیر دلخواه این دستورات را اجرا کنید:
 
 ```powershell
 git clone -b arena/01a0b49e-bg https://github.com/Mooli-web/BG.git
 cd BG
 ```
 
-اگر branch بعداً در `main` merge شده بود، clone معمولی نیز کافی است:
+اگر قبلاً پوشه‌ای با نام `BG` وجود دارد و می‌خواهید از صفر clone کنید:
 
 ```powershell
-git clone https://github.com/Mooli-web/BG.git
+cd ..
+Remove-Item -Recurse -Force .\BG
+git clone -b arena/01a0b49e-bg https://github.com/Mooli-web/BG.git
 cd BG
 ```
 
-### ۳) ساخت virtual environment و نصب وابستگی‌ها
+دستور حذف را فقط زمانی اجرا کنید که مطمئن هستید داخل پوشه فایل مهمی ندارید.
+
+## ۲. نصب وابستگی‌های اجرای محلی
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements-play.txt
 ```
 
-`requirements-dev.txt` علاوه بر وابستگی‌های اجرای برنامه، ابزار تست `pytest` را هم نصب می‌کند. اگر فقط اجرای برنامه را می‌خواهید، `requirements.txt` کافی است.
-
-اگر دستور `py` روی سیستم شما وجود ندارد، به‌جای آن از `python` استفاده کنید:
+اگر PowerShell اجازه‌ی فعال‌سازی نداد:
 
 ```powershell
-python -m venv .venv
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
-برای استفاده از GPU انویدیا، ابتدا نسخه‌ی مناسب PyTorch همان کارت و درایور را از صفحه‌ی رسمی PyTorch نصب کنید و بعد بقیه‌ی requirements را نصب کنید. روی CPU نیز پروژه اجرا می‌شود، اما آموزش میلیون‌ها تصمیم طولانی‌تر خواهد بود.
-
-### ۴) تست نصب
-
-در حالی که `.venv` فعال است:
+برای اطمینان:
 
 ```powershell
-python -m pytest
 python -m bg --help
 ```
 
-باید تست‌ها سبز شوند و سه دستور `train`، `evaluate` و `play` را ببینید.
+## ۳. قرار دادن checkpoint دانلودشده
 
-### ۵) یک اجرای کوتاه برای اطمینان
-
-قبل از آموزش طولانی، یک تست چند هزار تصمیمی انجام دهید:
-
-```powershell
-python -m bg train --total-steps 10000 --num-envs 4 --rollout-steps 128 --checkpoint-dir checkpoints\smoke
-```
-
-در پایان باید فایل زیر ساخته شده باشد:
+فایل `latest.pt` دانلودشده از Colab را در این مسیر قرار دهید:
 
 ```text
-checkpoints\smoke\latest.pt
+BG\checkpoints\latest.pt
 ```
 
-### ۶) آموزش اصلی چندمیلیونی
-
-اجرای پیش‌فرض یعنی **۵٬۰۰۰٬۰۰۰ تصمیم حرکت مهره**، نه پنج میلیون بازی کامل. هر تصمیم می‌تواند یک حرکت از نوبت فعلی باشد و چند تصمیم پشت سر هم یک نوبت تاس را کامل می‌کنند.
-
-**مهم:** قانون بیرون آوردن مهره در نسخه‌ی جدید اصلاح شده است؛ مدل قبلی که با نسخه‌ی دارای این خطا آموزش دیده بود ممکن است از تجربه‌های غیرقانونی استفاده کرده باشد. برای نتیجه‌ی معتبر، checkpoint قبلی را کنار بگذارید و آموزش را از صفر و در یک پوشه‌ی جدید شروع کنید.
-
-برای شروع پیشنهادی روی CPU:
+اگر پوشه وجود ندارد:
 
 ```powershell
-python -m bg train `
-  --total-steps 5000000 `
-  --num-envs 8 `
-  --rollout-steps 256 `
-  --device cpu `
-  --checkpoint-dir checkpoints\run-5m
+New-Item -ItemType Directory -Force checkpoints
 ```
 
-روی GPU یا CPU قوی‌تر می‌توانید parallel environment را بیشتر کنید:
+یا می‌توانید checkpoint را در هر مسیر دیگری قرار دهید و همان مسیر را به دستور بدهید.
+
+## ۴. ارزیابی روی Windows
 
 ```powershell
-python -m bg train --total-steps 10000000 --num-envs 16 --rollout-steps 256 --device auto --checkpoint-dir checkpoints\run-10m
+python -m bg evaluate --checkpoint checkpoints\latest.pt --games 100 --device cpu
 ```
 
-در PowerShell علامت backtick یعنی ادامه‌ی همان دستور در خط بعد. اگر خواستید همه را یک‌خطی بنویسید:
+اگر نسخه‌ی PyTorch نصب‌شده GPU را درست شناسایی می‌کند:
 
 ```powershell
-python -m bg train --total-steps 5000000 --num-envs 8 --rollout-steps 256 --device cpu --checkpoint-dir checkpoints\run-5m
+python -m bg evaluate --checkpoint checkpoints\latest.pt --games 100 --device auto
 ```
 
-خروجی‌های مهم:
-
-- `checkpoints\run-5m\latest.pt`: آخرین مدل؛
-- `checkpoints\run-5m\checkpoint_XXXXXXXXXXXX.pt`: checkpointهای دوره‌ای؛
-- `checkpoints\run-5m\training.csv`: loss و آمار آموزش.
-
-`--total-steps` هدف کلی است. مثلاً اگر تا ۵ میلیون آموزش داده‌اید و می‌خواهید تا ۱۰ میلیون ادامه دهید:
+## ۵. اجرای بازی گرافیکی
 
 ```powershell
-python -m bg train `
-  --resume checkpoints\run-5m\latest.pt `
-  --total-steps 10000000 `
-  --num-envs 8 `
-  --rollout-steps 256 `
-  --device auto `
-  --checkpoint-dir checkpoints\run-10m
-```
-
-در اجرای resume بهتر است `--hidden-size` و `--residual-blocks` را مانند اجرای اول نگه دارید. اگر هدف فقط ادامه‌ی همان پوشه است، می‌توانید `--checkpoint-dir checkpoints\run-5m` بگذارید.
-
-### ۷) ارزیابی مدل بدون باز کردن GUI
-
-مقابل بازیکن تصادفی:
-
-```powershell
-python -m bg evaluate --checkpoint checkpoints\run-5m\latest.pt --games 100
-```
-
-برای ارزیابی با نمونه‌برداری تصادفی از سیاست:
-
-```powershell
-python -m bg evaluate --checkpoint checkpoints\run-5m\latest.pt --games 100 --stochastic
-```
-
-برای اجرای مدل مقابل خودش:
-
-```powershell
-python -m bg evaluate --checkpoint checkpoints\run-5m\latest.pt --games 20 --self-play
-```
-
-در ارزیابی مقابل random، مقدار `ai_win_rate` معیار ساده‌ای برای مقایسه‌ی runهای مختلف است. برای مقایسه‌ی علمی‌تر، seed و تعداد بازی یکسان استفاده کنید.
-
-### ۸) بازی انسان مقابل شبکه
-
-```powershell
-python -m bg play --checkpoint checkpoints\run-5m\latest.pt --human white
+python -m bg play --checkpoint checkpoints\latest.pt --human white --device cpu --ai-delay 1500
 ```
 
 یا با مهره‌ی سیاه:
 
 ```powershell
-python -m bg play --checkpoint checkpoints\run-5m\latest.pt --human black
+python -m bg play --checkpoint checkpoints\latest.pt --human black --device cpu --ai-delay 1500
 ```
 
-برای آهسته‌تر کردن حرکت‌های AI، زمان مکث را بر حسب میلی‌ثانیه افزایش دهید:
+`--ai-delay 1500` یعنی AI بین هر حرکت ۱.۵ ثانیه مکث می‌کند. اگر سرعت بیشتری خواستید:
 
 ```powershell
-python -m bg play --checkpoint checkpoints\run-5m\latest.pt --human white --ai-delay 1500
+python -m bg play --checkpoint checkpoints\latest.pt --human white --device cpu --ai-delay 800
 ```
 
-کنترل‌ها:
+در رابط گرافیکی نمایش داده می‌شود:
+
+- چیدمان استاندارد تخته‌نرد؛
+- تاس کامل نوبت؛
+- تاس‌های مصرف‌شده؛
+- آخرین حرکت AI؛
+- تعداد مهره‌های خارج‌شده و روی Bar؛
+- نوار ارزیابی AI از `-1` تا `+1`.
+
+## کنترل‌های بازی
 
 - روی مهره‌ی مشخص‌شده کلیک کنید؛
-- اگر برای آن مهره دو تاس ممکن بود، روی تاس موردنظر در پنل سمت راست کلیک کنید یا کلید `1` تا `6` را بزنید؛
-- اگر هیچ حرکتی ممکن نبود، `Space` یا دکمه‌ی `SPACE Pass` را بزنید؛
-- کلید `R` بازی جدید و `Esc` خروج است.
-- در نسخه‌ی فعلی AI بین هر حرکت تقریباً یک ثانیه مکث می‌کند؛ در پنل سمت راست تاس کامل نوبت، تاس‌های مصرف‌شده و آخرین حرکت آن نمایش داده می‌شود.
-- نوار `AI evaluation` خروجی value head شبکه است: `+1` یعنی وضعیت از نگاه AI بسیار خوب، `-1` یعنی بسیار بد. این عدد احتمال قطعی برد نیست.
+- اگر برای یک مهره چند تاس ممکن بود، روی تاس موردنظر در پنل سمت راست کلیک کنید یا کلید همان عدد را بزنید؛
+- اگر هیچ حرکت قانونی وجود نداشت، `Space` را بزنید؛
+- کلید `R`: بازی جدید؛
+- کلید `Esc`: خروج.
 
-## تنظیم تعداد تمرین
+# تعداد پیشنهادی آموزش
 
-پیشنهاد عملی:
+| تعداد تصمیم | کاربرد |
+|---:|---|
+| `10,000` | تست اجرای Colab |
+| `500,000` تا `1,000,000` | مدل اولیه |
+| `5,000,000` تا `10,000,000` | مدل قابل بازی |
+| `20,000,000+` | آزمایش قوی‌تر |
 
-| هدف | دستور | کاربرد |
-|---|---:|---|
-| تست نصب | `10,000` | فقط اطمینان از صحت اجرا |
-| نمونه‌ی اولیه | `500,000` تا `1,000,000` | بررسی روند آموزش |
-| مدل قابل بازی | `5,000,000` تا `10,000,000` | شروع ارزیابی جدی |
-| آزمایش قوی‌تر | `20,000,000+` | کیفیت بهتر با زمان بیشتر |
+هر `step` یک تصمیم حرکت مهره است، نه یک بازی کامل. برای شروع بهتر است ابتدا `100000` یا `500000` step اجرا کنید، نتیجه را ارزیابی کنید و بعد آموزش را ادامه دهید.
 
-کیفیت در self-play به‌صورت یکنواخت با تعداد steps زیاد نمی‌شود؛ بنابراین `training.csv` و win rate مقابل random را بررسی کنید. عدد مناسب به CPU/GPU و هدف شما بستگی دارد. اگر آموزش ناپایدار شد، `--reward-shaping 0.001` را آزمایش کنید؛ حالت پیش‌فرض `0.0` است و فقط پاداش برد/باخت را استفاده می‌کند.
+# تست توسعه‌دهنده
 
-## خطاهای معمول Windows
+اگر روی محیطی هستید که وابستگی‌ها نصب شده‌اند:
 
-- **`No module named ...`**: ابتدا `.venv` را فعال کنید و دوباره `python -m pip install -r requirements.txt` را اجرا کنید.
-- **پنجره‌ی pygame باز نمی‌شود**: دستور `play` را روی خود Windows و در یک desktop اجرا کنید، نه محیط بدون نمایشگر یا SSH.
-- **CUDA error**: ابتدا با `--device cpu` مطمئن شوید پروژه سالم است؛ سپس نسخه‌ی PyTorch سازگار با درایور GPU را نصب کنید.
-- **آموزش کند است**: `--num-envs` را کمی افزایش دهید، یا از GPU استفاده کنید. در لپ‌تاپ، اجرای ۵ میلیون step ممکن است زمان قابل‌توجهی ببرد.
-- **فایل checkpoint پیدا نشد**: مسیر کامل یا نسبی را دقیق بدهید؛ مسیر نسبی از همان پوشه‌ای است که PowerShell در آن `cd BG` کرده است.
+```powershell
+python -m pytest
+```
 
-فایل‌های وزن شبکه در `.gitignore` هستند و به GitHub ارسال نمی‌شوند؛ پس از آموزش، پوشه‌ی `checkpoints` روی کامپیوتر خودتان باقی می‌ماند.
+وضعیت مورد انتظار فعلی:
+
+```text
+11 passed
+```
