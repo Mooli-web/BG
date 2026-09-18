@@ -59,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     play_parser.add_argument("--human", choices=["white", "black"], default="white")
     play_parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     play_parser.add_argument("--seed", type=int, default=123)
+    play_parser.add_argument(
+        "--ai-delay",
+        type=int,
+        default=950,
+        help="milliseconds between AI moves; default: 950",
+    )
 
     return parser
 
@@ -106,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
             human_player=human_player,
             device_name=args.device,
             seed=args.seed,
+            ai_delay_ms=args.ai_delay,
         )
         return 0
 

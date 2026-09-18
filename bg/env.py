@@ -79,7 +79,8 @@ class BackgammonEnv:
         first = int(self.rng.integers(1, DICE_SIDES + 1))
         second = int(self.rng.integers(1, DICE_SIDES + 1))
         dice = (first,) * 4 if first == second else (first, second)
-        self.state.dice = tuple(sorted(dice))
+        self.state.turn_dice = tuple(sorted(dice))
+        self.state.dice = self.state.turn_dice
         self._turn_sequences = enumerate_turn_sequences(self.state, self.state.dice)
 
     def observation(self) -> np.ndarray:

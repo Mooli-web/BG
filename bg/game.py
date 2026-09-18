@@ -38,7 +38,10 @@ class GameState:
     bar: list[int] = field(default_factory=lambda: [0, 0])
     off: list[int] = field(default_factory=lambda: [0, 0])
     current_player: int = WHITE
+    # ``dice`` is the remaining dice for the current turn. ``turn_dice``
+    # keeps the original roll so a UI can show which dice have been used.
     dice: tuple[int, ...] = ()
+    turn_dice: tuple[int, ...] = ()
 
     @classmethod
     def initial(cls, starting_player: int = WHITE) -> "GameState":
@@ -67,6 +70,7 @@ class GameState:
             off=self.off.copy(),
             current_player=self.current_player,
             dice=tuple(self.dice),
+            turn_dice=tuple(self.turn_dice),
         )
 
     def validate(self) -> None:
