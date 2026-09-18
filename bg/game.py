@@ -122,6 +122,22 @@ def _can_land(board_value: int, player: int) -> bool:
     return board_value * sign >= -1
 
 
+def _all_checkers_in_home(state: GameState, player: int) -> bool:
+    """Return whether bearing off is allowed for this player.
+
+    A checker may only leave the board after every remaining checker is in the
+    player's home board.  The bar is checked separately by
+    ``legal_moves_for_die`` because bar priority means no board checker can
+    move while one of the player's checkers is waiting there.
+    """
+    sign = _sign(player)
+    if player == WHITE:
+        outside_home = range(0, 18)
+    else:
+        outside_home = range(6, BOARD_POINTS)
+    return not any(state.board[p] * sign > 0 for p in outside_home)
+
+
 def _has_checker_farther_from_exit(state: GameState, player: int, source: int) -> bool:
     sign = _sign(player)
     # White exits beyond point 23, so smaller home-board points are farther
@@ -157,6 +173,7 @@ def legal_moves_for_die(state: GameState, player: int, die: int) -> list[Move]:
             return [(BAR, die)]
         return []
 
+    can_bear_off = _all_checkers_in_home(state, player)
     moves: list[Move] = []
     for source, value in enumerate(state.board):
         if value * sign <= 0:
@@ -168,7 +185,10 @@ def legal_moves_for_die(state: GameState, player: int, die: int) -> list[Move]:
                 moves.append((source, die))
             continue
 
-        # A move beyond the edge can bear off only from the home board.
+        # A move beyond the edge can bear off only after every checker is in
+        # the home board, and only from that home board.
+        if not can_bear_off:
+            continue
         in_home = source >= 18 if player == WHITE else source <= 5
         if not in_home:
             continue

@@ -42,6 +42,21 @@ def test_single_checker_hit_goes_to_opponents_bar():
     assert state.bar[BLACK] == 1
 
 
+def test_bearing_off_is_forbidden_until_all_checkers_reach_home():
+    state = GameState(board=[0] * 24, off=[13, 15], current_player=WHITE)
+    state.board[17] = 1  # one checker is still outside White's home board
+    state.board[18] = 1
+    state.validate()
+
+    assert (18, 6) not in legal_moves_for_die(state, WHITE, 6)
+    assert (17, 6) in legal_moves_for_die(state, WHITE, 6)
+
+    # Once the outside checker enters the home board, bearing off becomes
+    # legal on a subsequent decision in the same turn.
+    apply_move(state, WHITE, (17, 6))
+    assert (18, 6) in legal_moves_for_die(state, WHITE, 6)
+
+
 def test_oversized_bearing_off_uses_furthest_checker_rule():
     state = GameState(board=[0] * 24, off=[13, 15], current_player=WHITE)
     state.board[18] = 1
