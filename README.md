@@ -26,7 +26,7 @@
 
 در نسخه‌ی اولیه یک خطای قانونی وجود داشت که اجازه می‌داد بازیکن قبل از ورود تمام مهره‌ها به خانه، مهره‌ای را خارج کند. این خطا اصلاح شده است.
 
-بنابراین checkpointهایی که قبل از این اصلاح آموزش داده شده‌اند برای آموزش معتبر مناسب نیستند. آموزش جدید را بدون `--resume` و در یک پوشه‌ی جدید شروع کنید.
+بنابراین checkpointهایی که قبل از این اصلاح آموزش داده شده‌اند برای آموزش معتبر مناسب نیستند. همچنین checkpointهای PPO قدیمی را نمی‌توان با trainer جدید TD(lambda) resume کرد. آموزش جدید را در پوشه‌ی `td_lambda_cpu_v1` و بدون `--resume` از checkpoint قبلی شروع کنید.
 
 ## ساختار پروژه
 
@@ -150,7 +150,7 @@ import os
 
 drive.mount('/content/drive')
 
-CHECKPOINT_DIR = '/content/drive/MyDrive/BG_RL/checkpoints_fixed_rules'
+CHECKPOINT_DIR = '/content/drive/MyDrive/BG_RL/td_lambda_cpu_v1'
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 print(CHECKPOINT_DIR)
 ```
@@ -188,9 +188,9 @@ Notebook آماده همین کار را خودکار انجام می‌دهد؛
 فایل‌های مهم در Google Drive:
 
 ```text
-BG_RL/checkpoints_fixed_rules/latest.pt
-BG_RL/checkpoints_fixed_rules/training.csv
-BG_RL/checkpoints_fixed_rules/checkpoint_XXXXXXXXXXXX.pt
+BG_RL/td_lambda_cpu_v1/latest.pt
+BG_RL/td_lambda_cpu_v1/training.csv
+BG_RL/td_lambda_cpu_v1/checkpoint_XXXXXXXXXXXX.pt
 ```
 
 `latest.pt` مدل فعلی است و `training.csv` آمار آموزش را نگه می‌دارد.

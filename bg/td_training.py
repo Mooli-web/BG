@@ -204,8 +204,12 @@ def train_td(config: TDTrainConfig) -> Path:
 
     if config.resume:
         checkpoint = torch.load(config.resume, map_location=device)
-        if checkpoint.get("algorithm", "td_lambda") != "td_lambda":
-            raise ValueError("--resume must point to a TD(lambda) checkpoint")
+        checkpoint_algorithm = checkpoint.get("algorithm", "unknown")
+        if checkpoint_algorithm != "td_lambda":
+            raise ValueError(
+                "--resume must point to a TD(lambda) checkpoint; "
+                f"found algorithm={checkpoint_algorithm!r}. Start TD(lambda) in a new checkpoint directory."
+            )
         model.load_state_dict(checkpoint["model"])
         if "optimizer" in checkpoint:
             optimizer.load_state_dict(checkpoint["optimizer"])
