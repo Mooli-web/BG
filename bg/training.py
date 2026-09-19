@@ -89,6 +89,18 @@ def _atomic_torch_save(payload: dict[str, Any], path: Path) -> None:
     temporary_path.replace(path)
 
 
+def _prune_periodic_checkpoints(directory: Path, keep: int = 3) -> None:
+    """Keep Drive storage bounded while preserving a few rollback points."""
+    archives = sorted(directory.glob("checkpoint_*.pt"))
+    for old_path in archives[:-keep]:
+        try:
+            old_path.unlink()
+        except OSError:
+            # A transient Google Drive filesystem error should not kill a
+            # running training process after latest.pt was safely written.
+            pass
+
+
 def _save_checkpoint(
     directory: Path,
     model: BackgammonActorCritic,
@@ -105,6 +117,7 @@ def _save_checkpoint(
     if periodic:
         periodic_path = directory / f"checkpoint_{global_steps:012d}.pt"
         _atomic_torch_save(payload, periodic_path)
+        _prune_periodic_checkpoints(directory)
     return latest
 
 

@@ -22,7 +22,12 @@ from .constants import ACTION_SIZE, OBSERVATION_SIZE
 from .env import BackgammonEnv
 from .inference import choose_action
 from .model import BackgammonValueNetwork, resolve_device
-from .training import _atomic_torch_save, _optimizer_to_device, _seed_everything
+from .training import (
+    _atomic_torch_save,
+    _optimizer_to_device,
+    _prune_periodic_checkpoints,
+    _seed_everything,
+)
 
 
 @dataclass
@@ -91,6 +96,7 @@ def _save_td_checkpoint(
     if periodic:
         periodic_path = directory / f"checkpoint_{global_steps:012d}.pt"
         _atomic_torch_save(payload, periodic_path)
+        _prune_periodic_checkpoints(directory)
     return latest
 
 
