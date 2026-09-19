@@ -8,6 +8,7 @@ import torch
 from .constants import BAR, BLACK, BOARD_POINTS, PASS_ACTION, WHITE, action_index, decode_action
 from .env import BackgammonEnv
 from .game import destination_for
+from .inference import choose_action
 from .model import load_checkpoint, resolve_device
 
 
@@ -364,6 +365,7 @@ def run_game(
     device_name: str = "auto",
     seed: int = 123,
     ai_delay_ms: int = AI_MOVE_DELAY_MS,
+    search_samples: int = 2,
 ) -> None:
     """Open the local GUI and run a paced human-vs-checkpoint game."""
     try:
@@ -373,6 +375,8 @@ def run_game(
 
     if ai_delay_ms < 0:
         raise ValueError("ai_delay_ms must be non-negative")
+    if search_samples < 0:
+        raise ValueError("search_samples must be non-negative")
     device = resolve_device(device_name)
     model, _ = load_checkpoint(checkpoint_path, device=device)
     env = BackgammonEnv(seed=seed)
@@ -494,11 +498,14 @@ def run_game(
         if not env.done and env.current_player == ai_player:
             now = pygame.time.get_ticks()
             if now - last_ai_time >= ai_delay_ms:
-                observation = torch.as_tensor(env.observation(), dtype=torch.float32, device=device)
-                mask = torch.as_tensor(env.action_mask(), dtype=torch.bool, device=device)
-                with torch.no_grad():
-                    action, _, _ = model.choose_action(observation, mask, deterministic=True)
-                apply_action(int(action.item()), actor_is_ai=True)
+                action = choose_action(
+                    model,
+                    env,
+                    device,
+                    deterministic=True,
+                    search_samples=search_samples,
+                )
+                apply_action(action, actor_is_ai=True)
 
         now = pygame.time.get_ticks()
         if now - last_evaluation_time >= EVALUATION_REFRESH_MS:

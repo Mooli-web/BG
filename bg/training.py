@@ -35,7 +35,7 @@ class TrainConfig:
     max_grad_norm: float = 0.5
     hidden_size: int = 256
     residual_blocks: int = 3
-    reward_shaping: float = 0.0
+    reward_shaping: float = 0.0005
     seed: int = 7
     checkpoint_dir: str = "checkpoints"
     save_interval: int = 50

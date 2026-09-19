@@ -9,6 +9,7 @@ import numpy as np
 import torch
 
 from .env import BackgammonEnv
+from .inference import choose_action
 from .model import BackgammonActorCritic, load_checkpoint, resolve_device
 
 
@@ -24,19 +25,6 @@ class MatchResult:
         return self.ai_wins / self.games if self.games else 0.0
 
 
-def _model_action(
-    model: BackgammonActorCritic,
-    observation: np.ndarray,
-    mask: np.ndarray,
-    device: torch.device,
-    deterministic: bool,
-) -> int:
-    observation_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
-    mask_tensor = torch.as_tensor(mask, dtype=torch.bool, device=device)
-    action, _, _ = model.choose_action(observation_tensor, mask_tensor, deterministic=deterministic)
-    return int(action.item())
-
-
 def _random_action(mask: np.ndarray, rng: np.random.Generator) -> int:
     legal = np.flatnonzero(mask)
     return int(rng.choice(legal))
@@ -49,6 +37,7 @@ def play_match(
     deterministic: bool = True,
     seed: int = 123,
     self_play: bool = False,
+    search_samples: int = 0,
 ) -> MatchResult:
     """Play the model against a random player, or against itself."""
     if games <= 0:
@@ -68,7 +57,13 @@ def play_match(
         while not done:
             mask = env.action_mask()
             if self_play or env.current_player == ai_player:
-                action = _model_action(model, observation, mask, device, deterministic)
+                action = choose_action(
+                    model,
+                    env,
+                    device,
+                    deterministic=deterministic,
+                    search_samples=search_samples,
+                )
             else:
                 action = _random_action(mask, rng)
             observation, _, done, info = env.step(action)
@@ -97,6 +92,7 @@ def evaluate_checkpoint(
     device_name: str = "auto",
     deterministic: bool = True,
     self_play: bool = False,
+    search_samples: int = 0,
 ) -> MatchResult:
     device = resolve_device(device_name)
     model, _ = load_checkpoint(checkpoint_path, device=device)
@@ -106,6 +102,7 @@ def evaluate_checkpoint(
         device=device,
         deterministic=deterministic,
         self_play=self_play,
+        search_samples=search_samples,
     )
 
 
@@ -123,6 +120,12 @@ def add_evaluate_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="use the checkpoint for both players instead of one random opponent",
     )
+    parser.add_argument(
+        "--search-samples",
+        type=int,
+        default=2,
+        help="value-guided chance samples per legal move; 0 uses raw policy",
+    )
 
 
 def evaluation_from_args(args: argparse.Namespace) -> int:
@@ -132,6 +135,7 @@ def evaluation_from_args(args: argparse.Namespace) -> int:
         device_name=args.device,
         deterministic=not args.stochastic,
         self_play=args.self_play,
+        search_samples=args.search_samples,
     )
     print(
         f"games={result.games} | ai_wins={result.ai_wins} | "

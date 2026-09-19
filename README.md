@@ -38,6 +38,7 @@ bg/
   model.py         شبکه Actor-Critic و بارگذاری checkpoint
   training.py      حلقه PPO و ذخیره مدل
   evaluate.py      ارزیابی مقابل random یا self-play
+  inference.py     انتخاب policy و value-guided search در زمان بازی
   ui.py            رابط گرافیکی pygame
   cli.py           دستورات train / evaluate / play
 
@@ -171,6 +172,7 @@ command = [
     '--save-interval', '5',
     '--log-interval', '10',
     '--seed', '7',
+    '--reward-shaping', '0.0005',
 ]
 
 print(' '.join(command))
@@ -211,7 +213,9 @@ command = [
 subprocess.run(command, check=True)
 ```
 
-برای chunkهای بعدی مقدار `--total-steps` را به ۷۵۰۰۰۰، ۱۰۰۰۰۰۰ و ... افزایش دهید. Notebook این مقدارها را خودکار مدیریت می‌کند. اگر هدف نهایی را `10000000` بگذارید، آموزش از checkpoint فعلی تا ۱۰ میلیون step ادامه پیدا می‌کند.
+برای chunkهای بعدی مقدار `--total-steps` را به ۷۵۰۰۰۰، ۱۰۰۰۰۰۰ و ... افزایش دهید. Notebook این مقدارها را خودکار مدیریت می‌کند. اگر هدف نهایی را `10000000` یا `20000000` بگذارید، آموزش از checkpoint فعلی تا همان هدف ادامه پیدا می‌کند.
+
+پارامتر `--reward-shaping 0.0005` یک سیگنال کوچک برای پیشرفت pip، زدن مهره و بیرون آوردن مهره می‌دهد. پاداش اصلی همچنان برد و باخت است، اما این سیگنال باعث می‌شود PPO با فقط چند میلیون تصمیم مثل یک بازیکن کاملاً تصادفی باقی نماند.
 
 ### ۷. ارزیابی در Colab
 
@@ -326,7 +330,15 @@ python -m bg play --checkpoint checkpoints\latest.pt --human white --device cpu 
 python -m bg play --checkpoint checkpoints\latest.pt --human black --device cpu --ai-delay 1500
 ```
 
-`--ai-delay 1500` یعنی AI بین هر حرکت ۱.۵ ثانیه مکث می‌کند. اگر سرعت بیشتری خواستید:
+`--ai-delay 1500` یعنی AI بین هر حرکت ۱.۵ ثانیه مکث می‌کند. `--search-samples 2` به‌صورت پیش‌فرض حرکت‌های قانونی را با value head مقایسه می‌کند. برای قدرت بیشتر اما سرعت کمتر، مقدار `4` را امتحان کنید؛ برای خاموش کردن search مقدار `0` را بدهید.
+
+مثال:
+
+```powershell
+python -m bg play --checkpoint checkpoints\latest.pt --human white --device cpu --ai-delay 1500 --search-samples 4
+```
+
+اگر سرعت بیشتری خواستید:
 
 ```powershell
 python -m bg play --checkpoint checkpoints\latest.pt --human white --device cpu --ai-delay 800
@@ -339,7 +351,8 @@ python -m bg play --checkpoint checkpoints\latest.pt --human white --device cpu 
 - تاس‌های مصرف‌شده؛
 - آخرین حرکت AI؛
 - تعداد مهره‌های خارج‌شده و روی Bar؛
-- نوار ارزیابی AI از `-1` تا `+1`.
+- نوار ارزیابی AI از `-1` تا `+1`؛
+- در زمان بازی، به‌صورت پیش‌فرض برای هر حرکت از دو نمونه‌ی value-guided برای مقایسه‌ی حرکت‌های قانونی استفاده می‌شود.
 
 ## کنترل‌های بازی
 
@@ -355,8 +368,9 @@ python -m bg play --checkpoint checkpoints\latest.pt --human white --device cpu 
 |---:|---|
 | `10,000` | تست اجرای Colab |
 | `500,000` تا `1,000,000` | مدل اولیه |
-| `5,000,000` تا `10,000,000` | مدل قابل بازی |
-| `20,000,000+` | آزمایش قوی‌تر |
+| `5,000,000` | baseline اولیه؛ معمولاً هنوز ضعیف است |
+| `10,000,000` تا `20,000,000` | مدل قابل‌قبول‌تر |
+| `20,000,000+` | آموزش قوی‌تر و پایدارتر |
 
 هر `step` یک تصمیم حرکت مهره است، نه یک بازی کامل. برای شروع بهتر است ابتدا `100000` یا `500000` step اجرا کنید، نتیجه را ارزیابی کنید و بعد آموزش را ادامه دهید.
 

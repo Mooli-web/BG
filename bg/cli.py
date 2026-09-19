@@ -35,8 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument(
         "--reward-shaping",
         type=float,
-        default=0.0,
-        help="optional pip-progress reward; 0 keeps a sparse +1/-1 game reward",
+        default=0.0005,
+        help="pip-progress reward; use 0 for a sparse +1/-1 game reward (default: 0.0005)",
     )
     train_parser.add_argument("--seed", type=int, default=7)
     train_parser.add_argument("--checkpoint-dir", default="checkpoints")
@@ -64,6 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=950,
         help="milliseconds between AI moves; default: 950",
+    )
+    play_parser.add_argument(
+        "--search-samples",
+        type=int,
+        default=2,
+        help="value-guided chance samples per legal move; 0 uses raw policy",
     )
 
     return parser
@@ -113,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
             device_name=args.device,
             seed=args.seed,
             ai_delay_ms=args.ai_delay,
+            search_samples=args.search_samples,
         )
         return 0
 
