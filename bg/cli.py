@@ -1,0 +1,172 @@
+"""Command-line entry points for training, evaluation, and the GUI."""
+
+from __future__ import annotations
+
+import argparse
+
+from .td_training import TDTrainConfig, train_td
+from .training import TrainConfig, train
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="bg",
+        description="Train a self-play RL backgammon agent and play against it.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    train_parser = subparsers.add_parser(
+        "train", help="train with TD(lambda) self-play (PPO remains available)"
+    )
+    train_parser.add_argument(
+        "--algorithm",
+        choices=["td_lambda", "ppo"],
+        default="td_lambda",
+        help="training algorithm; TD(lambda) is recommended for backgammon",
+    )
+    train_parser.add_argument(
+        "--total-steps",
+        type=int,
+        default=20_000_000,
+        help="total checker-move decisions; default: 20,000,000",
+    )
+    train_parser.add_argument("--num-envs", type=int, default=8)
+    train_parser.add_argument("--rollout-steps", type=int, default=128)
+    train_parser.add_argument("--learning-rate", type=float, default=1e-4)
+    train_parser.add_argument("--gamma", type=float, default=0.995)
+    train_parser.add_argument("--gae-lambda", type=float, default=0.95, help="PPO only")
+    train_parser.add_argument("--td-lambda", type=float, default=0.70, help="TD(lambda) trace parameter")
+    train_parser.add_argument("--epsilon-start", type=float, default=0.25)
+    train_parser.add_argument("--epsilon-end", type=float, default=0.02)
+    train_parser.add_argument("--epsilon-decay-steps", type=int, default=10_000_000)
+    train_parser.add_argument(
+        "--search-samples",
+        type=int,
+        default=1,
+        help="chance samples per legal move for TD action selection",
+    )
+    train_parser.add_argument("--update-epochs", type=int, default=4)
+    train_parser.add_argument("--minibatch-size", type=int, default=1024)
+    train_parser.add_argument("--entropy-coef", type=float, default=0.01)
+    train_parser.add_argument("--value-coef", type=float, default=0.5)
+    train_parser.add_argument("--hidden-size", type=int, default=256)
+    train_parser.add_argument("--residual-blocks", type=int, default=3)
+    train_parser.add_argument(
+        "--reward-shaping",
+        type=float,
+        default=0.0005,
+        help="pip-progress reward; use 0 for a sparse +1/-1 game reward (default: 0.0005)",
+    )
+    train_parser.add_argument("--seed", type=int, default=7)
+    train_parser.add_argument("--checkpoint-dir", default="checkpoints")
+    train_parser.add_argument("--save-interval", type=int, default=50, help="save every N updates")
+    train_parser.add_argument("--log-interval", type=int, default=10, help="print every N updates")
+    train_parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    train_parser.add_argument(
+        "--resume",
+        default=None,
+        help="resume from a checkpoint; --total-steps is the new total target",
+    )
+
+    evaluate_parser = subparsers.add_parser("evaluate", help="measure a checkpoint against a random player")
+    from .evaluate import add_evaluate_arguments
+
+    add_evaluate_arguments(evaluate_parser)
+
+    play_parser = subparsers.add_parser("play", help="open the pygame human-vs-AI board")
+    play_parser.add_argument("--checkpoint", required=True, help="path to checkpoints/latest.pt")
+    play_parser.add_argument("--human", choices=["white", "black"], default="white")
+    play_parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    play_parser.add_argument("--seed", type=int, default=123)
+    play_parser.add_argument(
+        "--ai-delay",
+        type=int,
+        default=950,
+        help="milliseconds between AI moves; default: 950",
+    )
+    play_parser.add_argument(
+        "--search-samples",
+        type=int,
+        default=2,
+        help="value-guided chance samples per legal move; 0 uses raw policy",
+    )
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command == "train":
+        if args.algorithm == "td_lambda":
+            config = TDTrainConfig(
+                total_steps=args.total_steps,
+                num_envs=args.num_envs,
+                rollout_steps=args.rollout_steps,
+                learning_rate=args.learning_rate,
+                gamma=args.gamma,
+                td_lambda=args.td_lambda,
+                update_epochs=args.update_epochs,
+                minibatch_size=args.minibatch_size,
+                hidden_size=args.hidden_size,
+                residual_blocks=args.residual_blocks,
+                reward_shaping=args.reward_shaping,
+                epsilon_start=args.epsilon_start,
+                epsilon_end=args.epsilon_end,
+                epsilon_decay_steps=args.epsilon_decay_steps,
+                search_samples=args.search_samples,
+                seed=args.seed,
+                checkpoint_dir=args.checkpoint_dir,
+                save_interval=args.save_interval,
+                log_interval=args.log_interval,
+                device=args.device,
+                resume=args.resume,
+            )
+            train_td(config)
+        else:
+            config = TrainConfig(
+                total_steps=args.total_steps,
+                num_envs=args.num_envs,
+                rollout_steps=args.rollout_steps,
+                learning_rate=args.learning_rate,
+                gamma=args.gamma,
+                gae_lambda=args.gae_lambda,
+                update_epochs=args.update_epochs,
+                minibatch_size=args.minibatch_size,
+                entropy_coef=args.entropy_coef,
+                value_coef=args.value_coef,
+                hidden_size=args.hidden_size,
+                residual_blocks=args.residual_blocks,
+                reward_shaping=args.reward_shaping,
+                seed=args.seed,
+                checkpoint_dir=args.checkpoint_dir,
+                save_interval=args.save_interval,
+                log_interval=args.log_interval,
+                device=args.device,
+                resume=args.resume,
+            )
+            train(config)
+        return 0
+
+    if args.command == "evaluate":
+        from .evaluate import evaluation_from_args
+
+        return evaluation_from_args(args)
+
+    if args.command == "play":
+        from .ui import run_game
+
+        human_player = 0 if args.human == "white" else 1
+        run_game(
+            checkpoint_path=args.checkpoint,
+            human_player=human_player,
+            device_name=args.device,
+            seed=args.seed,
+            ai_delay_ms=args.ai_delay,
+            search_samples=args.search_samples,
+        )
+        return 0
+
+    parser.error(f"unknown command: {args.command}")
+    return 2
