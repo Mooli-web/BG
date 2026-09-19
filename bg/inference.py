@@ -15,7 +15,9 @@ import numpy as np
 import torch
 
 from .env import BackgammonEnv
-from .model import BackgammonActorCritic
+from .model import BackgammonActorCritic, BackgammonValueNetwork
+
+ModelLike = BackgammonActorCritic | BackgammonValueNetwork
 
 
 SEARCH_GAMMA = 0.995
@@ -33,8 +35,24 @@ def _policy_action(
     return int(action.item())
 
 
+def value_of_observation(
+    model: ModelLike,
+    observation: np.ndarray | torch.Tensor,
+    device: torch.device | str,
+) -> float:
+    """Return the model value for one observation."""
+    device = torch.device(device)
+    tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
+    with torch.no_grad():
+        if isinstance(model, BackgammonValueNetwork):
+            value = model(tensor)
+        else:
+            _, value = model(tensor)
+    return float(value.reshape(-1)[0].item())
+
+
 def _batched_values(
-    model: BackgammonActorCritic,
+    model: ModelLike,
     observations: list[np.ndarray],
     device: torch.device,
 ) -> np.ndarray:
@@ -42,12 +60,15 @@ def _batched_values(
         return np.empty(0, dtype=np.float32)
     batch = torch.as_tensor(np.stack(observations), dtype=torch.float32, device=device)
     with torch.no_grad():
-        _, values = model(batch)
+        if isinstance(model, BackgammonValueNetwork):
+            values = model(batch)
+        else:
+            _, values = model(batch)
     return values.detach().cpu().numpy()
 
 
 def choose_action(
-    model: BackgammonActorCritic,
+    model: ModelLike,
     env: BackgammonEnv,
     device: torch.device | str,
     deterministic: bool = True,
@@ -62,7 +83,11 @@ def choose_action(
     policy's learned preferences when values are close.
     """
     device = torch.device(device)
-    if search_samples <= 0:
+    if isinstance(model, BackgammonValueNetwork):
+        # A value-only model has no policy head; one-ply value search is its
+        # action selector even when the caller passes search_samples=0.
+        search_samples = max(1, search_samples)
+    elif search_samples <= 0:
         return _policy_action(model, env, device, deterministic)
 
     legal_actions = np.flatnonzero(env.action_mask())
@@ -71,10 +96,14 @@ def choose_action(
 
     model.eval()
     actor = env.current_player
-    base_observation = torch.as_tensor(env.observation(), dtype=torch.float32, device=device)
-    with torch.no_grad():
-        logits, _ = model(base_observation)
-    legal_logits = logits[0, torch.as_tensor(legal_actions, device=device)].detach().cpu().numpy()
+    if isinstance(model, BackgammonValueNetwork):
+        # There is no learned action prior for TD-Gammon-style value models.
+        legal_logits = np.zeros(len(legal_actions), dtype=np.float32)
+    else:
+        base_observation = torch.as_tensor(env.observation(), dtype=torch.float32, device=device)
+        with torch.no_grad():
+            logits, _ = model(base_observation)
+        legal_logits = logits[0, torch.as_tensor(legal_actions, device=device)].detach().cpu().numpy()
     prior_scale = 0.04
     legal_logits = (legal_logits - legal_logits.mean()) / (legal_logits.std() + 1e-6)
 

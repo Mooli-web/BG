@@ -67,6 +67,7 @@ def _checkpoint_payload(
     update: int,
 ) -> dict[str, Any]:
     return {
+        "algorithm": "ppo",
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "global_steps": global_steps,

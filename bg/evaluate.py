@@ -10,7 +10,7 @@ import torch
 
 from .env import BackgammonEnv
 from .inference import choose_action
-from .model import BackgammonActorCritic, load_checkpoint, resolve_device
+from .model import load_checkpoint, resolve_device
 
 
 @dataclass
@@ -31,7 +31,7 @@ def _random_action(mask: np.ndarray, rng: np.random.Generator) -> int:
 
 
 def play_match(
-    model: BackgammonActorCritic,
+    model: torch.nn.Module,
     games: int = 100,
     device: torch.device | str = "cpu",
     deterministic: bool = True,

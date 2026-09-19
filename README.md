@@ -1,6 +1,6 @@
 # BG — هوش مصنوعی تخته‌نرد با یادگیری تقویتی
 
-این پروژه یک بازیکن تخته‌نرد است که با **Self-Play و PPO** آموزش می‌بیند. پیشنهاد استفاده‌ی فعلی این است:
+این پروژه یک بازیکن تخته‌نرد است که با **Self-Play و TD(lambda)** آموزش می‌بیند. PPO به‌عنوان گزینه‌ی آزمایشی باقی مانده، اما الگوریتم پیش‌فرض و پیشنهادی TD(lambda) شبیه TD-Gammon است.
 
 - **آموزش و ارزیابی متنی:** Google Colab، به‌صورت پیش‌فرض با CPU؛ GPU اختیاری؛
 - **بازی گرافیکی انسان مقابل مدل:** کامپیوتر Windows با pygame.
@@ -12,8 +12,8 @@
 - قوانین تخته‌نرد شامل تاس جفت، Bar، زدن مهره، بیشترین تعداد حرکت و قانون تاس بزرگ‌تر؛
 - جلوگیری از بیرون آوردن مهره تا زمانی که هر ۱۵ مهره‌ی بازیکن به خانه‌ی خودش نرسیده باشند؛
 - محیط Self-Play با action masking؛
-- الگوریتم PPO؛
-- شبکه‌ی Residual MLP Actor-Critic با سه بلوک ۲۵۶ نورونی؛
+- الگوریتم TD(lambda) ارزش‌محور با self-play و epsilon-greedy؛
+- شبکه‌ی Residual MLP Value با سه بلوک ۲۵۶ نورونی؛
 - اجرای موازی چندین بازی برای آموزش چندمیلیونی؛
 - checkpoint قابل ذخیره در Google Drive و ادامه‌ی آموزش؛
 - ارزیابی مقابل بازیکن تصادفی بدون نیاز به pygame؛
@@ -35,8 +35,9 @@ bg/
   constants.py     کدگذاری action و اندازه‌های محیط
   game.py          قوانین تخته‌نرد و تولید حرکت
   env.py           محیط Self-Play و action mask
-  model.py         شبکه Actor-Critic و بارگذاری checkpoint
-  training.py      حلقه PPO و ذخیره مدل
+  model.py         شبکه Value و Actor-Critic و بارگذاری checkpoint
+  training.py      حلقه PPO قدیمی/آزمایشی
+  td_training.py   حلقه TD(lambda) پیشنهادی و ذخیره مدل
   evaluate.py      ارزیابی مقابل random یا self-play
   inference.py     انتخاب policy و value-guided search در زمان بازی
   ui.py            رابط گرافیکی pygame
@@ -164,6 +165,7 @@ import sys
 
 command = [
     sys.executable, '-m', 'bg', 'train',
+    '--algorithm', 'td_lambda',
     '--total-steps', '250000',
     '--num-envs', '8',
     '--rollout-steps', '128',
@@ -173,6 +175,8 @@ command = [
     '--log-interval', '10',
     '--seed', '7',
     '--reward-shaping', '0.0005',
+    '--td-lambda', '0.70',
+    '--search-samples', '1',
 ]
 
 print(' '.join(command))
@@ -215,7 +219,7 @@ subprocess.run(command, check=True)
 
 برای chunkهای بعدی مقدار `--total-steps` را به ۷۵۰۰۰۰، ۱۰۰۰۰۰۰ و ... افزایش دهید. Notebook این مقدارها را خودکار مدیریت می‌کند. اگر هدف نهایی را `10000000` یا `20000000` بگذارید، آموزش از checkpoint فعلی تا همان هدف ادامه پیدا می‌کند.
 
-پارامتر `--reward-shaping 0.0005` یک سیگنال کوچک برای پیشرفت pip، زدن مهره و بیرون آوردن مهره می‌دهد. پاداش اصلی همچنان برد و باخت است، اما این سیگنال باعث می‌شود PPO با فقط چند میلیون تصمیم مثل یک بازیکن کاملاً تصادفی باقی نماند.
+پارامتر `--reward-shaping 0.0005` یک سیگنال کوچک برای پیشرفت pip، زدن مهره و بیرون آوردن مهره می‌دهد. پاداش اصلی همچنان برد و باخت است، اما این سیگنال باعث می‌شود TD(lambda) از وضعیت‌های میانی هم بهتر یاد بگیرد.
 
 ### ۷. ارزیابی در Colab
 

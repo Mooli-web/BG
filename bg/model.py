@@ -30,6 +30,49 @@ class ResidualBlock(nn.Module):
         return residual + x
 
 
+class BackgammonValueNetwork(nn.Module):
+    """Value-only network used by the TD-Gammon-style trainer.
+
+    The network estimates the expected game outcome from the current player's
+    perspective.  A value-only model is intentionally paired with legal-move
+    lookahead at action time; this is the classic TD-Gammon pattern and avoids
+    forcing PPO to learn a large policy under a very sparse game reward.
+    """
+
+    def __init__(
+        self,
+        observation_size: int = OBSERVATION_SIZE,
+        hidden_size: int = 256,
+        residual_blocks: int = 3,
+    ):
+        super().__init__()
+        if residual_blocks < 1:
+            raise ValueError("residual_blocks must be at least 1")
+        self.observation_size = observation_size
+        self.action_size = 0
+        self.hidden_size = hidden_size
+        self.residual_blocks = residual_blocks
+        self.input_layer = nn.Sequential(
+            nn.Linear(observation_size, hidden_size),
+            nn.LayerNorm(hidden_size),
+            nn.SiLU(),
+        )
+        self.trunk = nn.Sequential(*(ResidualBlock(hidden_size) for _ in range(residual_blocks)))
+        self.value_head = nn.Sequential(
+            nn.LayerNorm(hidden_size),
+            nn.SiLU(),
+            nn.Linear(hidden_size, 1),
+            nn.Tanh(),
+        )
+
+    def forward(self, observation: torch.Tensor) -> torch.Tensor:
+        if observation.ndim == 1:
+            observation = observation.unsqueeze(0)
+        hidden = self.input_layer(observation)
+        hidden = self.trunk(hidden)
+        return self.value_head(hidden).squeeze(-1)
+
+
 class BackgammonActorCritic(nn.Module):
     """Shared MLP with separate masked policy and value heads.
 
@@ -130,17 +173,25 @@ def resolve_device(requested: str = "auto") -> torch.device:
 def load_checkpoint(
     path: str | Path,
     device: torch.device | str = "cpu",
-) -> tuple[BackgammonActorCritic, dict[str, Any]]:
+) -> tuple[nn.Module, dict[str, Any]]:
     """Load a saved model and its metadata."""
     device = torch.device(device)
     checkpoint = torch.load(Path(path), map_location=device)
     config = checkpoint.get("model_config", {})
-    model = BackgammonActorCritic(
-        observation_size=int(config.get("observation_size", OBSERVATION_SIZE)),
-        action_size=int(config.get("action_size", ACTION_SIZE)),
-        hidden_size=int(config.get("hidden_size", 256)),
-        residual_blocks=int(config.get("residual_blocks", 3)),
-    ).to(device)
+    algorithm = checkpoint.get("algorithm", "ppo")
+    if algorithm == "td_lambda":
+        model = BackgammonValueNetwork(
+            observation_size=int(config.get("observation_size", OBSERVATION_SIZE)),
+            hidden_size=int(config.get("hidden_size", 256)),
+            residual_blocks=int(config.get("residual_blocks", 3)),
+        ).to(device)
+    else:
+        model = BackgammonActorCritic(
+            observation_size=int(config.get("observation_size", OBSERVATION_SIZE)),
+            action_size=int(config.get("action_size", ACTION_SIZE)),
+            hidden_size=int(config.get("hidden_size", 256)),
+            residual_blocks=int(config.get("residual_blocks", 3)),
+        ).to(device)
     state_dict = checkpoint.get("model", checkpoint)
     model.load_state_dict(state_dict)
     model.eval()

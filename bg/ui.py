@@ -8,7 +8,7 @@ import torch
 from .constants import BAR, BLACK, BOARD_POINTS, PASS_ACTION, WHITE, action_index, decode_action
 from .env import BackgammonEnv
 from .game import destination_for
-from .inference import choose_action
+from .inference import choose_action, value_of_observation
 from .model import load_checkpoint, resolve_device
 
 
@@ -343,10 +343,7 @@ def _draw_sidebar(
 def _evaluate_for_ai(model, env: BackgammonEnv, device: torch.device, ai_player: int) -> float:
     if env.done:
         return 1.0 if env.winner == ai_player else -1.0
-    observation = torch.as_tensor(env.observation(), dtype=torch.float32, device=device)
-    with torch.no_grad():
-        _, value = model(observation)
-    raw_value = float(value.item())
+    raw_value = value_of_observation(model, env.observation(), device)
     # The observation/value is always from the player whose turn it is. Flip
     # it when the human is to move so the bar always means AI perspective.
     return raw_value if env.current_player == ai_player else -raw_value
